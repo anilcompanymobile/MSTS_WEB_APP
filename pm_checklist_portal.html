@@ -1519,8 +1519,7 @@ function generateExcel(){
 // PDF GENERATION — delegates to buildPDFDoc
 // ================================================================
 async function generatePDF(){
-   // Inside generatePDF() and/or exportZIP() — add at the top:
-syncPMToSheets(); // fire-and-forget, non-blocking
+  if(typeof syncPMToSheets === "function") syncPMToSheets();
   const rows = collectFormData();
   const dcbD = collectDCBData();
   const hasData = rows.length > 0 || (dcbD && dcbD.rows.length > 0);
@@ -2290,82 +2289,66 @@ function hideOverlay(){
 }
 </script>
 
-<!-- ============================================================
-     MASDAR STS — Google Sheets Integration (FIXED)
-     Uses no-cors form-encode trick to bypass CORS preflight
-     ============================================================ -->
 <script>
+// ================================================================
+// GOOGLE SHEETS INTEGRATION — MASDAR STS
+// Hidden-form POST trick: no CORS issues from static GitHub Pages
+// ================================================================
 const SHEETS_URL = "https://script.google.com/macros/s/AKfycbz7Qdu20oIyGf_QxNxJ9bO4Q2aI1DtZ61jcHm_YrKLkbH1dBzVYEmw-AN4V1jU5yjiE/exec";
 
-// Send via hidden form POST — bypasses CORS entirely, works from any static site
 function sendToGoogleSheets(type, data) {
-  return new Promise(function(resolve) {
-    try {
-      var payload = JSON.stringify({ type: type, data: data });
-      var form = document.createElement("form");
-      form.method = "POST";
-      form.action = SHEETS_URL;
-      form.target = "_sheets_iframe_" + Date.now();
-      form.style.display = "none";
-
-      var input = document.createElement("input");
-      input.type = "hidden";
-      input.name = "payload";
-      input.value = payload;
-      form.appendChild(input);
-
-      var iframe = document.createElement("iframe");
-      iframe.name = form.target;
-      iframe.style.display = "none";
-      document.body.appendChild(iframe);
-      document.body.appendChild(form);
-
-      iframe.onload = function() {
-        setTimeout(function() {
-          try { document.body.removeChild(iframe); } catch(e){}
-          try { document.body.removeChild(form); } catch(e){}
-        }, 2000);
-        resolve({ success: true });
-      };
-      iframe.onerror = function() {
-        resolve({ success: true }); // Apps Script still ran even if iframe errors
-      };
-
-      form.submit();
-      // Resolve after 3s regardless — form POST is fire-and-forget
-      setTimeout(function() { resolve({ success: true }); }, 3000);
-    } catch(err) {
-      console.error("Google Sheets sync error:", err);
-      resolve({ success: false, error: err.toString() });
-    }
-  });
+  try {
+    var payload = JSON.stringify({ type: type, data: data });
+    var iframeName = "_gs_" + Date.now();
+    var iframe = document.createElement("iframe");
+    iframe.name = iframeName;
+    iframe.style.display = "none";
+    var form = document.createElement("form");
+    form.method = "POST";
+    form.action = SHEETS_URL;
+    form.target = iframeName;
+    form.style.display = "none";
+    var input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "payload";
+    input.value = payload;
+    form.appendChild(input);
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    form.submit();
+    setTimeout(function() {
+      try { document.body.removeChild(iframe); } catch(e){}
+      try { document.body.removeChild(form); } catch(e){}
+    }, 4000);
+  } catch(err) {
+    console.error("Google Sheets sync error:", err);
+  }
 }
 
-async function syncPMToSheets() {
+function syncPMToSheets() {
   try {
     var data = {
-      phase:          (document.getElementById("phase") || {}).value          || "",
-      mvps:           (document.getElementById("mvps") || {}).value           || "",
-      equipment:      (document.getElementById("equipmentSelect") || {}).value || "",
-      equipSr:        (document.getElementById("equipSr") || {}).value        || "",
-      equipId:        (document.getElementById("equipId") || {}).value        || "",
-      mo:             (document.getElementById("mo") || {}).value             || "",
-      ptw:            (document.getElementById("ptw") || {}).value            || "",
-      freq:           (document.getElementById("freq") || {}).value           || "",
-      plannedDate:    (document.getElementById("plannedDate") || {}).value    || "",
-      startTime:      (document.getElementById("startTime") || {}).value      || "",
-      finishTime:     (document.getElementById("finishTime") || {}).value     || "",
-      maintIncharge:  (document.getElementById("maintIncharge") || {}).value  || "",
-      position:       (document.getElementById("position") || {}).value       || "",
-      reviewer:       (document.getElementById("reviewer") || {}).value       || "",
-      tech:           (document.getElementById("tech") || {}).value           || "",
-      submitBy:       (document.getElementById("submitBy") || {}).value       || "",
-      reviewBy:       (document.getElementById("reviewBy") || {}).value       || "",
-      overallRemarks: (document.getElementById("overallRemarks") || {}).value || "",
-      checklistItems: collectFormData()
+      phase:          (document.getElementById("phase")||{}).value || "",
+      mvps:           (document.getElementById("mvps")||{}).value || "",
+      equipment:      (document.getElementById("equipmentSelect")||{}).value || "",
+      equipSr:        (document.getElementById("equipSr")||{}).value || "",
+      equipId:        (document.getElementById("equipId")||{}).value || "",
+      mo:             (document.getElementById("mo")||{}).value || "",
+      ptw:            (document.getElementById("ptw")||{}).value || "",
+      freq:           (document.getElementById("freq")||{}).value || "",
+      plannedDate:    (document.getElementById("plannedDate")||{}).value || "",
+      startTime:      (document.getElementById("startTime")||{}).value || "",
+      finishTime:     (document.getElementById("finishTime")||{}).value || "",
+      maintIncharge:  (document.getElementById("maintIncharge")||{}).value || "",
+      position:       (document.getElementById("position")||{}).value || "",
+      reviewer:       (document.getElementById("reviewer")||{}).value || "",
+      tech:           (document.getElementById("tech")||{}).value || "",
+      submitBy:       (document.getElementById("submitBy")||{}).value || "",
+      reviewBy:       (document.getElementById("reviewBy")||{}).value || "",
+      overallRemarks: (document.getElementById("overallRemarks")||{}).value || "",
+      checklistItems: (typeof collectFormData === "function") ? collectFormData() : []
     };
-    showStatus("Saving to Google Sheets…", "info");
-    await sendToGoogleSheets("pm", data);
+    sendToGoogleSheets("pm", data);
     showStatus("✓ Saved to Google Sheets", "success");
   } catch(err) {
     console.error("syncPMToSheets error:", err);
